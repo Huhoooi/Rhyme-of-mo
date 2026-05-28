@@ -5,8 +5,8 @@ import { CameraController } from './core/CameraController.js';
 // import { SceneManager } from './core/SceneManager.js';
 
 // [同学A] — Perlin噪声地形 & L-System分形树
-// import { TerrainGenerator } from './generation/TerrainGenerator.js';
-// import { FractalTree } from './generation/FractalTree.js';
+import { TerrainGenerator } from './generation/TerrainGenerator.js';
+import { FractalTree } from './generation/FractalTree.js';
 
 // ── DOM refs ────────────────────────────────────────────────
 const app = document.getElementById('app');
@@ -59,14 +59,23 @@ sunLight.shadow.camera.bottom = -80;
 sunLight.shadow.bias = -0.0005;
 scene.add(sunLight);
 
-// ── Ground plane (临时; [同学A] 地形生成后移除) ──────────────
-const groundGeo = new THREE.PlaneGeometry(400, 400);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0xd5cfc0, roughness: 0.9 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-ground.name = '__temp_ground';
-scene.add(ground);
+// ── [同学A] 地形 & 分形树 ────────────────────────────────────
+const terrain = new TerrainGenerator(220, 256, 32, 42);
+const terrainMesh = terrain.createTerrainMesh();
+scene.add(terrainMesh);
+
+const { mesh: waterMesh, update: updateWater } = terrain.createWaterMesh();
+scene.add(waterMesh);
+
+const forest = new FractalTree({
+  treeCount: 350,
+  iterations: 4,
+  maxHeight: 9,
+  spreadRadius: 90,
+  seed: 137,
+});
+const forestMesh = forest.generate(terrain);
+scene.add(forestMesh);
 
 // ── Camera controller ───────────────────────────────────────
 const controller = new CameraController(camera, renderer.domElement, {
@@ -254,7 +263,8 @@ function animate() {
     controller.update(dt);
     checkNarrativeTriggers();
     // [同学B] sceneManager.update(dt);
-    // [同学A] tree sway animation, etc.
+    updateWater(now * 0.001);
+    forest.update(dt);
   }
 
   // Always render so the scene is visible behind menus
