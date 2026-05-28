@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>墨境漫游 — Rhyme of Mo</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+
+    body {
+      font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'SimSun', 'SimKai',
+                   'Ma Shan Zheng', 'ZCOOL KuaiLe', serif;
+      background: #1a1a1a;
+      color: #e8e0d0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ── App container ─────────────────────────────────── */
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #app canvas {
+      display: block;
+    }
+
+    /* ── Shared UI layer ───────────────────────────────── */
+    #ui-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #ui-layer > * {
+      pointer-events: auto;
+    }
+
+    /* ── Crosshair ─────────────────────────────────────── */
+    #crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 6px; height: 6px;
+      margin: -3px 0 0 -3px;
+      border-radius: 50%;
+      background: rgba(200, 190, 170, 0.7);
+      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      transition: opacity 0.3s;
+    }
+
+    /* ── Hint ──────────────────────────────────────────── */
+    #hint {
+      position: absolute;
+      bottom: 18%;
+      width: 100%;
+      text-align: center;
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      color: rgba(200, 190, 170, 0.85);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      animation: hintPulse 2.5s ease-in-out infinite;
+      transition: opacity 0.5s;
+    }
+    @keyframes hintPulse {
+      0%, 100% { opacity: 0.55; }
+      50%      { opacity: 0.95; }
+    }
+
+    /* ── Narrative popup ───────────────────────────────── */
+    #narrative {
+      position: absolute;
+      bottom: 14%;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 520px;
+      width: 90%;
+      padding: 18px 28px;
+      background: rgba(20, 18, 16, 0.82);
+      border: 1px solid rgba(180, 160, 130, 0.35);
+      border-radius: 6px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+      pointer-events: none;
+    }
+    #narrative.visible { opacity: 1; }
+    #narrative-title {
+      font-size: 1.5rem;
+      letter-spacing: 0.2em;
+      color: #c8a060;
+      margin-bottom: 8px;
+    }
+    #narrative-text {
+      font-size: 1rem;
+      line-height: 1.8;
+      letter-spacing: 0.08em;
+      color: #ccc0b0;
+    }
+
+    /* ── Menu panels (shared) ──────────────────────────── */
+    .menu-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 8, 6, 0.65);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+    .menu-panel {
+      background: rgba(24, 22, 20, 0.92);
+      border: 1px solid rgba(180, 150, 110, 0.4);
+      border-radius: 8px;
+      padding: 40px 48px;
+      min-width: 300px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .menu-panel h1 {
+      font-size: 2.2rem;
+      letter-spacing: 0.25em;
+      color: #c8a060;
+      margin-bottom: 28px;
+      font-weight: normal;
+    }
+    .menu-panel h2 {
+      font-size: 1.6rem;
+      letter-spacing: 0.2em;
+      color: #c8a060;
+      margin-bottom: 24px;
+      font-weight: normal;
+    }
+
+    /* ── Buttons ───────────────────────────────────────── */
+    .menu-btn {
+      display: block;
+      width: 100%;
+      margin-bottom: 14px;
+      padding: 10px 0;
+      font-family: inherit;
+      font-size: 1.1rem;
+      letter-spacing: 0.15em;
+      color: #d5cec0;
+      background: rgba(60, 50, 40, 0.5);
+      border: 1px solid rgba(160, 140, 110, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .menu-btn:hover {
+      background: rgba(100, 80, 55, 0.5);
+      color: #fff;
+      border-color: rgba(200, 160, 100, 0.6);
+    }
+    .menu-btn:active {
+      background: rgba(80, 60, 40, 0.6);
+    }
+
+    /* ── Settings row ──────────────────────────────────── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      gap: 16px;
+    }
+    .setting-row label {
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+      color: #c0b8a8;
+    }
+    .setting-row input[type="range"] {
+      flex: 1;
+      accent-color: #c8a060;
+      height: 4px;
+    }
+    .setting-row .val {
+      min-width: 42px;
+      text-align: right;
+      font-size: 0.9rem;
+      color: #a09080;
+    }
+
+    /* ── Utility ───────────────────────────────────────── */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Three.js canvas inserted here by main.js -->
+
+    <div id="ui-layer">
+      <!-- Crosshair (visible when pointer is locked) -->
+      <div id="crosshair" class="hidden"></div>
+
+      <!-- Click-to-start hint -->
+      <div id="hint" class="hidden">点击屏幕 开始漫游</div>
+
+      <!-- Narrative text popup -->
+      <div id="narrative" class="hidden">
+        <div id="narrative-title"></div>
+        <div id="narrative-text"></div>
+      </div>
+
+      <!-- Pause menu -->
+      <div id="pause-menu" class="menu-overlay hidden">
+        <div class="menu-panel">
+          <h1>墨境漫游</h1>
+          <button class="menu-btn" id="btn-resume">继续漫游</button>
+          <button class="menu-btn" id="btn-settings">设置</button>
+          <button class="menu-btn" id="btn-exit">退出</button>
+        </div>
+      </div>
+
+      <!-- Settings panel -->
+      <div id="settings-panel" class="menu-overlay hidden">
+        <div class="menu-panel">
+          <h2>设置</h2>
+          <div class="setting-row">
+            <label for="sensitivity-slider">鼠标灵敏度</label>
+            <input type="range" id="sensitivity-slider"
+                   min="0.0005" max="0.006" step="0.0001" value="0.002" />
+            <span class="val" id="sensitivity-value">0.002</span>
+          </div>
+          <!-- Future settings: volume, graphics, etc. -->
+          <button class="menu-btn" id="btn-back" style="margin-top:20px;">返回</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js import map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
