@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { CameraController } from './core/CameraController.js';
-
-// [同学B] — 场景管理、雾效、光照、后处理管线
-// import { SceneManager } from './core/SceneManager.js';
+import { SceneManager } from './core/SceneManager.js';
 
 // [同学A] — Perlin噪声地形 & L-System分形树
 // import { TerrainGenerator } from './generation/TerrainGenerator.js';
@@ -19,6 +17,9 @@ const uiPauseMenu = document.getElementById('pause-menu');
 const uiSettingsPanel = document.getElementById('settings-panel');
 const uiSensitivitySlider = document.getElementById('sensitivity-slider');
 const uiSensitivityVal = document.getElementById('sensitivity-value');
+const uiMusicFileInput = document.getElementById('music-file-input');
+const uiMusicFileName = document.getElementById('music-file-name');
+const uiMusicResetBtn = document.getElementById('music-reset-btn');
 
 // ── Three.js bootstrap ──────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -27,46 +28,21 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 0.82;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf5f0e8);
-scene.fog = new THREE.Fog(0xf5f0e8, 80, 300);
 
 const camera = new THREE.PerspectiveCamera(
-  65, window.innerWidth / window.innerHeight, 0.5, 500
+  60, window.innerWidth / window.innerHeight, 0.5, 700
 );
-camera.position.set(0, 12, 20);
-camera.lookAt(0, 5, -10);
+camera.position.set(0, 16, 32);
+camera.lookAt(0, 10, -38);
+
+const sceneManager = await SceneManager.create(scene, camera, renderer);
 
 // [同学B] 接管: SceneManager 会替换/增强 scene / renderer 配置
-// const sceneManager = new SceneManager(scene, renderer);
-
-// ── Lighting (基础; [同学B] 会替换) ────────────────────────
-const ambientLight = new THREE.AmbientLight(0xeeddcc, 1.2);
-scene.add(ambientLight);
-const sunLight = new THREE.DirectionalLight(0xffeedd, 2.5);
-sunLight.position.set(50, 80, 30);
-sunLight.castShadow = true;
-sunLight.shadow.mapSize.set(2048, 2048);
-sunLight.shadow.camera.near = 0.5;
-sunLight.shadow.camera.far = 300;
-sunLight.shadow.camera.left = -80;
-sunLight.shadow.camera.right = 80;
-sunLight.shadow.camera.top = 80;
-sunLight.shadow.camera.bottom = -80;
-sunLight.shadow.bias = -0.0005;
-scene.add(sunLight);
-
-// ── Ground plane (临时; [同学A] 地形生成后移除) ──────────────
-const groundGeo = new THREE.PlaneGeometry(400, 400);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0xd5cfc0, roughness: 0.9 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-ground.name = '__temp_ground';
-scene.add(ground);
+// const sceneManager = await SceneManager.create(scene, camera, renderer);
 
 // ── Camera controller ───────────────────────────────────────
 const controller = new CameraController(camera, renderer.domElement, {
@@ -192,15 +168,187 @@ function applySettings() {
   const sens = parseFloat(uiSensitivitySlider.value);
   controller.mouseSensitivity = sens;
   uiSensitivityVal.textContent = sens.toFixed(3);
+
+  const vol = parseFloat(document.getElementById('music-volume-slider').value);
+  if (audioManager) {
+    audioManager.setVolume(vol);
+  }
+  document.getElementById('music-volume-value').textContent = vol.toFixed(2);
 }
 
-// ── Controller lock-change callback ─────────────────────────
+function handleMusicFileChange(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file || !audioManager) return;
+  uiMusicFileName.textContent = file.name;
+  audioManager.loadUserFile(file);
+}
+
+function clearCustomMusic() {
+  uiMusicFileInput.value = '';
+  uiMusicFileName.textContent = '未选择';
+  if (!audioManager) return;
+  audioManager.stopCustomTrack();
+  audioManager.startGuqinPlayback();
+}
+
+// ── Audio Manager ──────────────────────────────────────────
+class GuqinAudioManager {
+  constructor() {
+    this.audioContext = null;
+    this.masterGain = null;
+    this.audioElement = null;
+    this.mediaSource = null;
+    this.customTrack = false;
+    this.guqinLoopTimer = null;
+    this.activeOscillators = [];
+    this.tempo = 0.6;
+    this.initAudio();
+    this.startGuqinPlayback();
+  }
+
+  initAudio() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    this.audioContext = audioContext;
+    this.masterGain = audioContext.createGain();
+    this.masterGain.gain.value = 0.3;
+    this.masterGain.connect(audioContext.destination);
+  }
+
+  resume() {
+    if (!this.audioContext) return;
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(() => { });
+    }
+    if (this.audioElement && this.customTrack) {
+      this.audioElement.play().catch(() => { });
+    }
+  }
+
+  setVolume(value) {
+    if (this.masterGain) {
+      this.masterGain.gain.value = Math.max(0, Math.min(1, value)) * 0.3;
+    }
+  }
+
+  stopGuqinPlayback() {
+    if (this.guqinLoopTimer) {
+      clearTimeout(this.guqinLoopTimer);
+      this.guqinLoopTimer = null;
+    }
+    for (const osc of this.activeOscillators) {
+      try {
+        osc.stop();
+      } catch (error) {
+        // ignore already stopped oscillators
+      }
+    }
+    this.activeOscillators.length = 0;
+  }
+
+  stopCustomTrack() {
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement.src = '';
+      this.audioElement = null;
+    }
+    if (this.mediaSource) {
+      this.mediaSource.disconnect();
+      this.mediaSource = null;
+    }
+    this.customTrack = false;
+  }
+
+  loadUserFile(file) {
+    if (!file) return;
+    this.stopCustomTrack();
+    this.stopGuqinPlayback();
+
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'auto';
+    audio.muted = false;
+
+    const source = this.audioContext.createMediaElementSource(audio);
+    source.connect(this.masterGain);
+
+    this.audioElement = audio;
+    this.mediaSource = source;
+    this.customTrack = true;
+    this.resume();
+    audio.play().catch(() => { });
+  }
+
+  playNote(frequency, duration, startTime) {
+    const ctx = this.audioContext;
+    const osc = ctx.createOscillator();
+    const envGain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, startTime);
+    osc.frequency.exponentialRampToValueAtTime(frequency * 0.8, startTime + duration * 0.7);
+
+    envGain.gain.setValueAtTime(0.2, startTime);
+    envGain.gain.linearRampToValueAtTime(0.18, startTime + duration * 0.15);
+    envGain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+    osc.connect(envGain);
+    envGain.connect(this.masterGain);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+    this.activeOscillators.push(osc);
+    osc.addEventListener('ended', () => {
+      const index = this.activeOscillators.indexOf(osc);
+      if (index !== -1) this.activeOscillators.splice(index, 1);
+    });
+  }
+
+  startGuqinPlayback() {
+    if (this.customTrack || this.guqinLoopTimer) return;
+
+    const melody = [
+      { freq: 261.63, dur: 0.8 },
+      { freq: 293.66, dur: 0.6 },
+      { freq: 329.63, dur: 0.7 },
+      { freq: 349.23, dur: 0.8 },
+      { freq: 329.63, dur: 0.6 },
+      { freq: 293.66, dur: 0.7 },
+      { freq: 261.63, dur: 1.0 },
+      { freq: 220.0, dur: 0.5 },
+      { freq: 246.94, dur: 0.6 },
+      { freq: 261.63, dur: 0.8 },
+    ];
+
+    const scheduleNotes = () => {
+      if (this.customTrack) return;
+      const now = this.audioContext.currentTime;
+      let time = now;
+      for (let i = 0; i < melody.length; i++) {
+        const note = melody[i];
+        this.playNote(note.freq, note.dur * this.tempo * 0.85, time);
+        time += note.dur * this.tempo;
+      }
+      this.guqinLoopTimer = setTimeout(() => {
+        this.guqinLoopTimer = null;
+        scheduleNotes();
+      }, (time - now) * 1000 + 200);
+    };
+
+    scheduleNotes();
+  }
+}
+
+let audioManager = null;
+
 controller.onLockChange = (locked) => {
   if (locked) {
     if (!gameStarted) gameStarted = true;
     hidePauseMenu();
     uiHint.classList.add('hidden');
     uiCrosshair.classList.remove('hidden');
+    if (audioManager) audioManager.resume();
   } else if (gameStarted) {
     showPauseMenu();
   }
@@ -219,6 +367,9 @@ document.getElementById('btn-exit').addEventListener('click', () => {
 });
 
 uiSensitivitySlider.addEventListener('input', applySettings);
+document.getElementById('music-volume-slider').addEventListener('input', applySettings);
+uiMusicFileInput.addEventListener('change', handleMusicFileChange);
+uiMusicResetBtn.addEventListener('click', clearCustomMusic);
 
 // Keyboard shortcut: Esc handled by pointer-lock (browser default).
 // Additional: 'P' also toggles pause.
@@ -235,12 +386,21 @@ window.addEventListener('resize', () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
-  // [同学B] sceneManager.resize(w, h);
+  sceneManager.resize(w, h);
 });
 
 // ── Main loop ───────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
+
+  // Initialize audio on first frame
+  if (!audioManager) {
+    try {
+      audioManager = new GuqinAudioManager();
+    } catch (e) {
+      console.warn('Audio initialization failed:', e);
+    }
+  }
 
   const now = performance.now();
   let dt = (now - lastTime) / 1000;
@@ -252,13 +412,13 @@ function animate() {
 
   if (!paused) {
     controller.update(dt);
+    sceneManager.update(dt);
     checkNarrativeTriggers();
-    // [同学B] sceneManager.update(dt);
     // [同学A] tree sway animation, etc.
   }
 
   // Always render so the scene is visible behind menus
-  renderer.render(scene, camera);
+  sceneManager.render();
 }
 
 // ── Boot ────────────────────────────────────────────────────

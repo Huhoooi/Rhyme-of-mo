@@ -1,17 +1,30 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>墨境漫游 — Rhyme of Mo</title>
   <style>
     /* ── Reset ─────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
 
     body {
       font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', 'SimSun', 'SimKai',
-                   'Ma Shan Zheng', 'ZCOOL KuaiLe', serif;
+        'Ma Shan Zheng', 'ZCOOL KuaiLe', serif;
       background: #1a1a1a;
       color: #e8e0d0;
       user-select: none;
@@ -24,6 +37,7 @@
       width: 100%;
       height: 100%;
     }
+
     #app canvas {
       display: block;
     }
@@ -35,19 +49,22 @@
       pointer-events: none;
       z-index: 10;
     }
-    #ui-layer > * {
+
+    #ui-layer>* {
       pointer-events: auto;
     }
 
     /* ── Crosshair ─────────────────────────────────────── */
     #crosshair {
       position: absolute;
-      top: 50%; left: 50%;
-      width: 6px; height: 6px;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 6px;
       margin: -3px 0 0 -3px;
       border-radius: 50%;
       background: rgba(200, 190, 170, 0.7);
-      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
       transition: opacity 0.3s;
     }
 
@@ -60,13 +77,21 @@
       font-size: 1.4rem;
       letter-spacing: 0.15em;
       color: rgba(200, 190, 170, 0.85);
-      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
       animation: hintPulse 2.5s ease-in-out infinite;
       transition: opacity 0.5s;
     }
+
     @keyframes hintPulse {
-      0%, 100% { opacity: 0.55; }
-      50%      { opacity: 0.95; }
+
+      0%,
+      100% {
+        opacity: 0.55;
+      }
+
+      50% {
+        opacity: 0.95;
+      }
     }
 
     /* ── Narrative popup ───────────────────────────────── */
@@ -86,13 +111,18 @@
       transition: opacity 0.8s ease;
       pointer-events: none;
     }
-    #narrative.visible { opacity: 1; }
+
+    #narrative.visible {
+      opacity: 1;
+    }
+
     #narrative-title {
       font-size: 1.5rem;
       letter-spacing: 0.2em;
       color: #c8a060;
       margin-bottom: 8px;
     }
+
     #narrative-text {
       font-size: 1rem;
       line-height: 1.8;
@@ -111,6 +141,7 @@
       backdrop-filter: blur(3px);
       -webkit-backdrop-filter: blur(3px);
     }
+
     .menu-panel {
       background: rgba(24, 22, 20, 0.92);
       border: 1px solid rgba(180, 150, 110, 0.4);
@@ -118,8 +149,9 @@
       padding: 40px 48px;
       min-width: 300px;
       text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
+
     .menu-panel h1 {
       font-size: 2.2rem;
       letter-spacing: 0.25em;
@@ -127,6 +159,7 @@
       margin-bottom: 28px;
       font-weight: normal;
     }
+
     .menu-panel h2 {
       font-size: 1.6rem;
       letter-spacing: 0.2em;
@@ -151,11 +184,13 @@
       cursor: pointer;
       transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
+
     .menu-btn:hover {
       background: rgba(100, 80, 55, 0.5);
       color: #fff;
       border-color: rgba(200, 160, 100, 0.6);
     }
+
     .menu-btn:active {
       background: rgba(80, 60, 40, 0.6);
     }
@@ -168,17 +203,26 @@
       margin-bottom: 18px;
       gap: 16px;
     }
+
     .setting-row label {
       font-size: 1rem;
       letter-spacing: 0.1em;
       white-space: nowrap;
       color: #c0b8a8;
     }
-    .setting-row input[type="range"] {
+
+    .setting-row input[type="range"],
+    .setting-row input[type="file"] {
       flex: 1;
       accent-color: #c8a060;
       height: 4px;
     }
+
+    .setting-row input[type="file"] {
+      height: auto;
+      color: #e8e0d0;
+    }
+
     .setting-row .val {
       min-width: 42px;
       text-align: right;
@@ -187,9 +231,12 @@
     }
 
     /* ── Utility ───────────────────────────────────────── */
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
+
 <body>
   <div id="app">
     <!-- Three.js canvas inserted here by main.js -->
@@ -223,12 +270,21 @@
           <h2>设置</h2>
           <div class="setting-row">
             <label for="sensitivity-slider">鼠标灵敏度</label>
-            <input type="range" id="sensitivity-slider"
-                   min="0.0005" max="0.006" step="0.0001" value="0.002" />
+            <input type="range" id="sensitivity-slider" min="0.0005" max="0.006" step="0.0001" value="0.002" />
             <span class="val" id="sensitivity-value">0.002</span>
           </div>
-          <!-- Future settings: volume, graphics, etc. -->
-          <button class="menu-btn" id="btn-back" style="margin-top:20px;">返回</button>
+          <div class="setting-row">
+            <label for="music-volume-slider">古琴音量</label>
+            <input type="range" id="music-volume-slider" min="0" max="1" step="0.05" value="0.5" />
+            <span class="val" id="music-volume-value">0.50</span>
+          </div>
+          <div class="setting-row">
+            <label for="music-file-input">背景音乐文件</label>
+            <input type="file" id="music-file-input" accept="audio/*" />
+            <span class="val" id="music-file-name">未选择</span>
+          </div>
+          <button class="menu-btn" id="music-reset-btn" style="margin-top:10px;">恢复古琴</button>
+          <button class="menu-btn" id="btn-back" style="margin-top:10px;">返回</button>
         </div>
       </div>
     </div>
@@ -238,11 +294,13 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/": "https://unpkg.com/three@0.160.0/"
       }
     }
   </script>
 
   <script type="module" src="main.js"></script>
 </body>
+
 </html>
