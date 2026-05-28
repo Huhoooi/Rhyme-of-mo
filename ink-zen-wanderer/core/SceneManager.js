@@ -507,8 +507,12 @@ export class SceneManager {
     this.noiseScene = new THREE.Scene();
     this.noiseCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const plane = new THREE.PlaneGeometry(2, 2);
+    const texture = new THREE.TextureLoader().load(buildPaperNoiseDataURL(256));
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(6, 6);
+
     this.overlayMaterial = new THREE.MeshBasicMaterial({
-      map: createPaperNoiseTexture(256),
+      map: texture,
       transparent: true,
       opacity: 0.22,
       depthWrite: false,
