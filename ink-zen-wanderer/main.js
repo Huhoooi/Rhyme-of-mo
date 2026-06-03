@@ -5,8 +5,9 @@ import { CameraController } from './core/CameraController.js';
 // import { SceneManager } from './core/SceneManager.js';
 
 // [同学A] — Perlin噪声地形 & L-System分形树
-// import { TerrainGenerator } from './generation/TerrainGenerator.js';
-// import { FractalTree } from './generation/FractalTree.js';
+import { TerrainGenerator } from './generation/TerrainGenerator.js';
+import { FractalTree } from './generation/FractalTree.js';
+import { SceneryBuilder } from './generation/SceneryBuilder.js';
 
 // ── DOM refs ────────────────────────────────────────────────
 const app = document.getElementById('app');
@@ -59,14 +60,25 @@ sunLight.shadow.camera.bottom = -80;
 sunLight.shadow.bias = -0.0005;
 scene.add(sunLight);
 
-// ── Ground plane (临时; [同学A] 地形生成后移除) ──────────────
-const groundGeo = new THREE.PlaneGeometry(400, 400);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0xd5cfc0, roughness: 0.9 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-ground.name = '__temp_ground';
-scene.add(ground);
+// ── Terrain (同学A) — replaces temp ground ──────────────────
+const terrainGen = new TerrainGenerator({
+  size: 400,
+  resolution: 256,
+  heightScale: 22,
+  noiseScale: 0.012,
+  octaves: 6,
+  waterLevel: 2.0,
+});
+scene.add(terrainGen.mesh);
+scene.add(terrainGen.water);
+
+// ── Trees (同学A) — L-System 分形树 + GPU Instancing ──────────
+const trees = new FractalTree({
+  terrain: terrainGen,
+  count: 350,
+  spawnRadius: 185,
+});
+trees.init(scene);
 
 // ── Camera controller ───────────────────────────────────────
 const controller = new CameraController(camera, renderer.domElement, {
@@ -127,6 +139,13 @@ const narrativeTriggers = [
     text: '暮色渐起，山影朦胧。这场墨境漫游，终须一别。',
   },
 ];
+
+// ── Scenery (同学A) — 六区域景观 ────────────────────────────
+const scenery = new SceneryBuilder({
+  terrain: terrainGen,
+  triggers: narrativeTriggers,
+});
+scenery.init(scene);
 
 function checkNarrativeTriggers() {
   const pos = camera.position;
@@ -252,9 +271,11 @@ function animate() {
 
   if (!paused) {
     controller.update(dt);
+    terrainGen.updateWater(now * 0.001);
+    trees.update(now, dt);
+    scenery.update(now * 0.001, dt);
     checkNarrativeTriggers();
     // [同学B] sceneManager.update(dt);
-    // [同学A] tree sway animation, etc.
   }
 
   // Always render so the scene is visible behind menus
