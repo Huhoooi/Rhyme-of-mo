@@ -41,9 +41,6 @@ camera.lookAt(0, 10, -38);
 
 const sceneManager = await SceneManager.create(scene, camera, renderer);
 
-// [同学B] 接管: SceneManager 会替换/增强 scene / renderer 配置
-// const sceneManager = await SceneManager.create(scene, camera, renderer);
-
 // ── Camera controller ───────────────────────────────────────
 const controller = new CameraController(camera, renderer.domElement, {
   moveSpeed: 10,
