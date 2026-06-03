@@ -347,7 +347,6 @@ export class SceneManager {
     this._createSky();
     this._createLights();
     this._createTerrain();
-    this._createDemoShapes();
     this._createFogLayers();
   }
 
@@ -485,23 +484,6 @@ export class SceneManager {
     this.scene.add(this.rainFar.rain);
   }
 
-  _createDemoShapes() {
-    const sphere = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(5, 3),
-      this.inkMaterial
-    );
-    sphere.position.set(-12, 6, -24);
-    sphere.castShadow = true;
-    this.scene.add(sphere);
-
-    const knot = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(3.5, 1.0, 128, 24),
-      this.inkMaterial
-    );
-    knot.position.set(16, 5, -28);
-    knot.castShadow = true;
-    this.scene.add(knot);
-  }
 
   _createPaperOverlay() {
     this.noiseScene = new THREE.Scene();

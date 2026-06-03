@@ -41,8 +41,18 @@ camera.position.set(0, 16, 32);
 camera.lookAt(0, 10, -38);
 
 // [同学B] 接管: SceneManager 会替换/增强 scene / renderer 配置
-// 如果需要使用 SceneManager.create 可在此处启用，但本次以同学 A 的环境为基准
-// const sceneManager = await SceneManager.create(scene, camera, renderer);
+// 启用 SceneManager.create 以加入雨、云雾、天空和纸张纹理叠加。
+const sceneManager = await SceneManager.create(scene, camera, renderer);
+
+// 移除 SceneManager 默认创建的地形（保持当前同学的 TerrainGenerator 地形）
+{
+  const terrainAuto = scene.children.find((child) => {
+    return child && child.isMesh && child.geometry && child.geometry.parameters && child.geometry.parameters.width === 620;
+  });
+  if (terrainAuto) {
+    scene.remove(terrainAuto);
+  }
+}
 
 // ── Lighting (基础; 可由 SceneManager 替换) ────────────────
 const ambientLight = new THREE.AmbientLight(0xeeddcc, 1.2);
@@ -429,7 +439,9 @@ window.addEventListener('resize', () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
-  sceneManager.resize(w, h);
+  if (typeof sceneManager !== 'undefined' && sceneManager && typeof sceneManager.resize === 'function') {
+    sceneManager.resize(w, h);
+  }
 });
 
 // ── Main loop ───────────────────────────────────────────────
@@ -455,21 +467,23 @@ function animate() {
 
   if (!paused) {
     controller.update(dt);
-<<<<<<< HEAD
-    terrainGen.updateWater(now * 0.001);
-    trees.update(now, dt);
-    scenery.update(now * 0.001, dt);
-    checkNarrativeTriggers();
-    // [同学B] sceneManager.update(dt);
-=======
-    sceneManager.update(dt);
-    checkNarrativeTriggers();
-    // [同学A] tree sway animation, etc.
->>>>>>> feat/ink-shader
+    if (typeof sceneManager !== 'undefined' && sceneManager && typeof sceneManager.update === 'function') {
+      sceneManager.update(dt);
+      checkNarrativeTriggers();
+    } else {
+      if (terrainGen && typeof terrainGen.updateWater === 'function') terrainGen.updateWater(now * 0.001);
+      if (trees && typeof trees.update === 'function') trees.update(now, dt);
+      if (scenery && typeof scenery.update === 'function') scenery.update(now * 0.001, dt);
+      checkNarrativeTriggers();
+    }
   }
 
   // Always render so the scene is visible behind menus
-  sceneManager.render();
+  if (typeof sceneManager !== 'undefined' && sceneManager && typeof sceneManager.render === 'function') {
+    sceneManager.render();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 
 // ── Boot ────────────────────────────────────────────────────
